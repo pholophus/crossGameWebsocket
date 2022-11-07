@@ -1,0 +1,96 @@
+import "@fluencelabs/aqua-lib/builtin.aqua" 
+
+data NFTDetail:
+    contractAddress: string
+    tokenId: string
+
+data NFTs:
+    length: u32
+    nft: []NFTDetail
+
+data Weapons: 
+    length: u32
+    weapon: []string
+
+service ICrossGameService("crossgameservice"):
+    readMetadata(contractAddress: string, tokenId: string) -> string
+    updateCharacter(walletAddress: string, weapon: string)
+    registration(walletAddress: string)
+    buyWeapon(walletAddress: string, weapon: string) -> bool
+    -- useWeapon(walletAddress: string, weapon: string)
+    getCurrentWeapon(walletAddress: string) -> string
+    getInventory(walletAddress: string) -> Weapons
+
+const PEER ?= "12D3KooWKkTd9Wkw7jxBbXWNRgRw9qaxmuK2PJW5bv3beHSKueLt"
+const RELAY ?= "12D3KooWDUszU2NeWyUVjCXhGEt1MoZrhvdmaQQwtZUriuGN1jTr"
+const SERVICE_ID ?= "crossgameservice"
+
+func getShopWeaponList(nfts: NFTs) -> *string:
+
+    weaponURL: *string
+
+    on PEER via RELAY:
+
+        for nft <- nfts.nft par:
+            weaponURL <- ICrossGameService.readMetadata(nft.contractAddress, nft.tokenId)
+    
+        join weaponURL[nfts.length]
+
+        par Peer.timeout(15000, "timeout")
+
+    <- weaponURL
+
+func updateCharacter(walletAddress: string, weapon: string):
+
+    on PEER via RELAY:
+        ICrossGameService.updateCharacter(walletAddress, weapon)
+
+func register(walletAddress: string):
+
+    on PEER via RELAY:
+        ICrossGameService.registration(walletAddress)
+
+func buyWeapon(walletAddress: string, weapon: string) -> *bool:
+
+    status: *bool
+
+    on PEER via RELAY:
+        statusBuy <- ICrossGameService.buyWeapon(walletAddress, weapon)
+
+        status <<- statusBuy
+    
+    <- status
+
+func getCurrentWeapon(walletAddress: string) -> *string:
+
+    currentWeapon: *string
+
+    on PEER via RELAY:
+        currentWeapon <- ICrossGameService.getCurrentWeapon(walletAddress)
+    
+    <- currentWeapon
+
+func getInventoryWeapon(walletAddress: string) -> *string:
+
+    listNFTs: *string
+    empty = ""
+
+    on PEER via RELAY:
+        weapons <- ICrossGameService.getInventory(walletAddress)
+
+        -- if weapons.length > 0:
+        --     for weapon <- weapons.weapon par:
+        --         listNFTs <<- weapon
+            
+        --     join listNFTs[weapons.length]
+        -- else:
+        --     listNFTs <<- empty
+        for weapon <- weapons.weapon par:
+            listNFTs <<- weapon
+        
+        join listNFTs[weapons.length]
+            
+    <- listNFTs
+
+    
+
